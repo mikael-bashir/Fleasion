@@ -69,7 +69,9 @@ class ConfigFolderWatcher(QObject):
 
         self._filesystem_watcher = QFileSystemWatcher(self)
         self._filesystem_watcher.directoryChanged.connect(self._on_directory_changed)
+        self._filesystem_watcher.fileChanged.connect(self._on_file_changed)
         self._sync_watched_directories()
+        self._sync_watched_files()
 
     def stop(self) -> None:
         """Stop watching and cancel pending import work."""
@@ -80,6 +82,7 @@ class ConfigFolderWatcher(QObject):
         self._retry_timer.stop()
         self._watch_retry_timer.stop()
         self._filesystem_watcher.removePaths(self._filesystem_watcher.directories())
+        self._filesystem_watcher.removePaths(self._filesystem_watcher.files())
 
     def _scan_names(self) -> set[str]:
         try:
@@ -143,6 +146,32 @@ class ConfigFolderWatcher(QObject):
         self.config_manager.invalidate_replacements_cache()
         self._sync_watched_directories()
 
+    def _sync_watched_files(self) -> None:
+        """Watch existing config JSON files for in-place modifications."""
+        current = set(self._filesystem_watcher.files())
+        desired: set[str] = set()
+        try:
+            for entry in self.folder.iterdir():
+                if entry.is_file() and entry.suffix.casefold() == '.json':
+                    desired.add(str(entry))
+        except OSError:
+            pass
+        if removed := sorted(current - desired):
+            self._filesystem_watcher.removePaths(removed)
+        if added := sorted(desired - current):
+            self._filesystem_watcher.addPaths(added)
+
+    def _on_file_changed(self, path: str) -> None:
+        """Invalidate cache and notify UI when a config file is modified in-place."""
+        if self._stopped:
+            return
+        self.config_manager.invalidate_replacements_cache()
+        # Qt removes the path from the watcher after fileChanged fires (the file
+        # may have been atomically replaced). Re-add it so future edits are caught.
+        if Path(path).exists():
+            self._filesystem_watcher.addPath(path)
+        self.configs_changed.emit()
+
     def _on_directory_changed(self, _path: str = '') -> None:
         """Invalidate resolved assets and process any root-level config changes."""
         if self._stopped:
@@ -159,6 +188,7 @@ class ConfigFolderWatcher(QObject):
     def _run_scheduled_scan(self) -> None:
         self._scan_scheduled = False
         self._sync_watched_directories()
+        self._sync_watched_files()
         self._scan()
 
     def _current_files(self) -> dict[str, Path]:
