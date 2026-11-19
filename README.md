@@ -19,8 +19,15 @@ This fork applies macOS-specific fixes on top of upstream Fleasion. The original
 
 ## Tested on
 
-- macOS (Apple Silicon), Roblox Player 0.748+, Env Proxy mode
+- macOS (Apple Silicon), Roblox Player 0.748+, Env Proxy mode, tested end-to-end
 - Windows 11 ARM: patch logic verified; full end-to-end test pending VM setup
+
+# Using Fleasion
+
+- Delete your Roblox cache with the fleasion ui
+- Log in to Roblox with a supported browser like Chrome
+- Load your auth tokens with "import browser login" at "Miscellaneous", then click "switch to selected", then click "Launch" once you
+have pasted a game link (you can find this for your game at the [Roblox home page](https://www.roblox.com/home), or from a private server owner, or launch without a link).
 
 ## Disclaimer
 
