@@ -766,6 +766,7 @@ class ReplacerConfigWindow(QDialog):
         self._rando_stuff_tab = RandoStuffTab(
             config_manager=self.config_manager,
             proxy_master=self.proxy_master,
+            env_lifecycle=getattr(self.roblox_monitor, 'env_lifecycle', None),
         )
         self._registered_module_interceptors = []
 
