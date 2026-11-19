@@ -24,7 +24,8 @@ This fork applies macOS-specific fixes on top of upstream Fleasion. The original
 
 # Using Fleasion
 
-- Delete your Roblox cache with the fleasion ui
+- Close Roblox (kill the Roblox process), Fleasion will launch Roblox
+- Delete your Roblox cache with the Fleasion ui
 - Log in to Roblox with a supported browser like Chrome
 - Load your auth tokens with "import browser login" at "Miscellaneous", then click "switch to selected", then click "Launch" once you
 have pasted a game link (you can find this for your game at the [Roblox home page](https://www.roblox.com/home), or from a private server owner, or launch without a link).
