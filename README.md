@@ -13,10 +13,14 @@ This fork applies macOS-specific fixes on top of upstream Fleasion. The original
 
 - **Live config reload:** Editing a config JSON in `configs/` with an external editor now immediately refreshes the Dashboard rule list. The original code only watched for file additions and removals, not in-place edits. This patch adds `fileChanged` watching to `folder_watcher.py`.
 
+- **TLS fix (Windows):** Scans `%LocalAppData%\Roblox\Versions` and `C:\Program Files (x86)\Roblox\Versions` for installed Player version directories and seeds `DFFlagHttpUseEmbeddedCaCerts=False` into `ClientSettings\ClientAppSettings.json` alongside each executable. This runs in addition to the existing `flag_cache.dat` seeding, covering cases where `flag_cache.dat` does not yet exist (fresh install or post-update) or where the JSON file is read first.
+
+- **Python 2 except syntax fix (all platforms):** 11 files contained `except TypeError, ValueError:` which in Python 3 silently catches only the first type. Fixed to `except (TypeError, ValueError):` throughout.
+
 ## Tested on
 
-- macOS (Apple Silicon), Roblox Player 0.748+
-- Env Proxy mode
+- macOS (Apple Silicon), Roblox Player 0.748+, Env Proxy mode
+- Windows 11 ARM: patch logic verified; full end-to-end test pending VM setup
 
 ## Disclaimer
 
