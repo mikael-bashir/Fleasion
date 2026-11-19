@@ -10,7 +10,8 @@ readme = 'README.md'
 requires-python = '>=3.14'
 dependencies = [
     'browser-cookie3>=0.20.1; sys_platform == "darwin" or sys_platform == "linux"',
-    'cryptography>=42.0.0,<47; sys_platform == "darwin" or (sys_platform == "win32" and platform_machine == "ARM64")',
+    'cryptography==46.0.3; sys_platform == "win32" and platform_machine == "ARM64"',
+    'cryptography>=42.0.0,<47; sys_platform == "darwin"',
     'cryptography>=49; sys_platform != "darwin" and (sys_platform != "win32" or platform_machine != "ARM64")',
     'win11toast>=0.36.3; sys_platform == "win32"',
     'pywin32>=307; sys_platform == "win32"',
