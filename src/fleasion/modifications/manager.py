@@ -589,7 +589,7 @@ class ModificationManager(QObject):
         for raw_path, raw_mode in payload.items():
             try:
                 modes[Path(raw_path)] = int(raw_mode)
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 continue
         return modes
 
@@ -1452,7 +1452,7 @@ class ModificationManager(QObject):
             value = self.global_settings_manager.read_framerate_cap()
         try:
             return 0 if value in (None, '', 'Default') else int(value)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return 0
 
     @framerate_cap.setter

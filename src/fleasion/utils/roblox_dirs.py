@@ -16,7 +16,7 @@ def _normalise_roblox_dir(value: str | Path) -> Path | None:
     """Return a valid Roblox install/resource directory, or None."""
     try:
         path = Path(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
     if '\x00' in str(path):
         return None

@@ -74,6 +74,7 @@ class CustomFFlagModifier:
         )
         self._macos_seeded_flag_names: set[str] = set()
         self._windows_seeded_flag_names: set[str] = set()
+        self._windows_cs_seeded_flag_names: set[str] = set()
         self._last_fresh_response_flags: tuple[tuple[str, str], ...] | None = None
         self._delivery_generation = 0
         self._delivery_state_lock = threading.Lock()
@@ -361,6 +362,124 @@ class CustomFFlagModifier:
             )
         return True
 
+    def _windows_client_settings_paths(self) -> list[Path]:
+        """Return Player ClientSettings files in every discovered Windows version dir."""
+        if not IS_WINDOWS:
+            return []
+        from ...utils.paths import ROBLOX_PROCESS
+
+        version_roots = [
+            LOCAL_APPDATA / 'Roblox' / 'Versions',
+            Path(r'C:\Program Files (x86)\Roblox\Versions'),
+        ]
+        paths: list[Path] = []
+        seen: set[str] = set()
+        for root in version_roots:
+            if not root.is_dir():
+                continue
+            try:
+                for entry in root.iterdir():
+                    if not entry.is_dir():
+                        continue
+                    if not (entry / ROBLOX_PROCESS).is_file():
+                        continue
+                    target = entry / MACOS_CLIENT_SETTINGS_REL
+                    key = str(target).lower()
+                    if key not in seen:
+                        seen.add(key)
+                        paths.append(target)
+            except OSError:
+                pass
+        return paths
+
+    def prime_windows_client_settings(self) -> bool:
+        """Seed flags into ClientSettings JSON in every discovered Windows version dir.
+
+        Windows Roblox reads ClientSettings/ClientAppSettings.json from the same
+        directory as the Player executable before flag_cache.dat on some builds.
+        Seeding both ensures DFFlagHttpUseEmbeddedCaCerts=False takes effect even
+        when flag_cache.dat does not yet exist (fresh install or post-update).
+        """
+        paths = self._windows_client_settings_paths()
+        if not paths:
+            return False
+
+        enabled = self.is_enabled()
+        flags = self.runtime_flags() if enabled else {}
+        desired_names = set(flags)
+        saved_names: set[str] = set()
+        if not self.custom_flags_enabled():
+            self._refresh_settings_from_disk()
+            saved_flags = (
+                self._disk_flags
+                if self._disk_flags is not None
+                else getattr(self.config_manager, 'custom_fflags', {})
+            )
+            saved_names = set(normalize_custom_fflags(saved_flags))
+            saved_names.add(DYNAMIC_VARIABLE_RELOAD_INTERVAL_FLAG)
+        stale_names = (self._windows_cs_seeded_flag_names | saved_names) - desired_names
+        updated_paths = 0
+
+        for target in paths:
+            try:
+                existing: dict[str, Any]
+                if target.exists():
+                    try:
+                        loaded = json.loads(target.read_text(encoding='utf-8'))
+                    except json.JSONDecodeError:
+                        log_buffer.log(
+                            'CustomFFlags',
+                            f'Could not decode Windows ClientSettings file; left unchanged: {target}',
+                        )
+                        continue
+                    if not isinstance(loaded, dict):
+                        log_buffer.log(
+                            'CustomFFlags',
+                            f'Windows ClientSettings root was not an object; left unchanged: {target}',
+                        )
+                        continue
+                    existing = loaded
+                else:
+                    existing = {}
+
+                merged = dict(existing)
+                for name in stale_names:
+                    merged.pop(name, None)
+                merged.update(flags)
+                if merged == existing:
+                    continue
+
+                original_mode = None
+                if target.exists():
+                    original_mode = stat.S_IMODE(target.stat().st_mode)
+                    self._clear_read_only(target)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                temporary = target.with_name(
+                    f'.{target.name}.fleasion-{os.getpid()}.tmp'
+                )
+                try:
+                    temporary.write_text(json.dumps(merged, indent=2), encoding='utf-8')
+                    if original_mode is not None:
+                        temporary.chmod(original_mode)
+                    temporary.replace(target)
+                finally:
+                    temporary.unlink(missing_ok=True)
+                updated_paths += 1
+            except (OSError, UnicodeDecodeError, TypeError, ValueError) as exc:
+                log_buffer.log(
+                    'CustomFFlags',
+                    f'Failed to seed Windows ClientSettings file {target}: {exc}',
+                )
+
+        self._windows_cs_seeded_flag_names = desired_names
+        if updated_paths:
+            log_buffer.log(
+                'CustomFFlags',
+                f'Pre-seeded Windows Roblox ClientSettings with {len(flags)} '
+                f'custom FastFlag(s) into {updated_paths} Player file(s)',
+            )
+        return bool(updated_paths)
+
     def _macos_client_settings_paths(self) -> list[Path]:
         """Return live Player ClientSettings files used during macOS startup."""
         resource_dirs = self._macos_resource_dirs
@@ -496,7 +615,12 @@ class CustomFFlagModifier:
         # helper contract for macOS; it must take precedence over the host OS.
         if self._macos_resource_dirs is not None or sys.platform == 'darwin':
             return self.prime_macos_client_settings()
-        return self.prime_windows_flag_cache()
+        # On Windows seed both flag_cache.dat and each version dir's
+        # ClientSettings/ClientAppSettings.json so the cert flag lands
+        # regardless of which path the client reads first.
+        seeded = self.prime_windows_flag_cache()
+        seeded |= self.prime_windows_client_settings()
+        return seeded
 
     @staticmethod
     def body_carries_signature(

@@ -98,7 +98,7 @@ def helper_has_expected_identity(status: dict | None) -> bool:
         return False
     try:
         version_ok = int(status.get('version', 0)) == EXPECTED_HELPER_VERSION
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         version_ok = False
     capabilities = {str(value) for value in status.get('capabilities') or []}
     return version_ok and REQUIRED_HELPER_CAPABILITIES.issubset(capabilities)
@@ -110,7 +110,7 @@ def helper_is_ready() -> bool:
         return False
     try:
         backend_ok = int(status.get('backend_port', 0)) == MACOS_PROXY_BACKEND_PORT
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         backend_ok = False
     if not backend_ok:
         return False
@@ -135,7 +135,7 @@ def _helper_readiness_diagnostic() -> tuple[bool, str]:
 
     try:
         backend_ok = int(status.get('backend_port', 0)) == MACOS_PROXY_BACKEND_PORT
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         backend_ok = False
     if not backend_ok:
         return (

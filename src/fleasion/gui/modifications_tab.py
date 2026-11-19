@@ -4170,7 +4170,7 @@ class FFlagSection(QWidget):
         # raise OverflowError before QSpinBox gets a chance to clamp it.
         try:
             framerate_cap = int(self._manager.framerate_cap)
-        except TypeError, ValueError, OverflowError:
+        except (TypeError, ValueError, OverflowError):
             framerate_cap = 0
         framerate_cap = max(
             self._framerate_cap.minimum(),

@@ -4159,7 +4159,7 @@ class CacheViewerTab(QWidget):
             asset_id = asset.get('id') or asset.get('asset_id')
             try:
                 asset_id = int(asset_id)
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 continue
 
             name = item.text() or 'Unknown'

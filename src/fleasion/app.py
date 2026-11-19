@@ -3383,7 +3383,7 @@ class RobloxExitMonitor(QObject):
             return
         try:
             pid = int(identity[0])
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return
         with self._macos_plain_launch_lock:
             if pid in self._macos_plain_launches:
@@ -3407,7 +3407,7 @@ class RobloxExitMonitor(QObject):
             try:
                 if int(current_identity[0]) != pid:
                     return
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 return
             if not self._macos_uri_interception_armed():
                 return
@@ -3804,7 +3804,7 @@ def _other_fleasion_pids() -> list:
                         continue
                     if 'launcher.py' in cmdline or 'fleasion' in cmdline:
                         pids.append(pid)
-            except json.JSONDecodeError, TypeError, ValueError:
+            except (json.JSONDecodeError, TypeError, ValueError):
                 pass
     except Exception:
         pass

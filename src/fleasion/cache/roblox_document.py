@@ -634,14 +634,14 @@ def _cast_number(value: Any, caster):
 def _safe_int(value: Any) -> int:
     try:
         return int(str(value).strip(), 0)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return 0
 
 
 def _safe_float(value: Any) -> float:
     try:
         return float(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return 0.0
 
 

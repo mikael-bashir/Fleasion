@@ -894,7 +894,7 @@ class TextureStripper:
         # Numeric asset ID — look up via economy API
         try:
             aid = int(key)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return False
         return self._is_anim_asset_id(aid)
 
@@ -936,7 +936,7 @@ class TextureStripper:
                 if self._is_anim_asset_id(int(repl_id)):
                     paths_to_process.append(local_path)
                     continue
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 pass
             # Last resort: peek at magic bytes for .dat / extensionless files
             try:

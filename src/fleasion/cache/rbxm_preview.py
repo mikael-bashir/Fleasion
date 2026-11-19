@@ -1434,14 +1434,14 @@ class RbxmPreviewWidget(QWidget):
     def _safe_int(value: Any) -> int:
         try:
             return int(str(value).strip(), 0)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return 0
 
     @staticmethod
     def _safe_float(value: Any) -> float:
         try:
             return float(value)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return 0.0
 
     @staticmethod
@@ -1672,7 +1672,7 @@ def _format_scalar(value: Any) -> str:
         return str(value)
     try:
         number = float(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return _compact(str(value), 80)
     if abs(number) < 1e-8:
         number = 0.0

@@ -1125,7 +1125,7 @@ class ConfigManager:
                 0,
                 min(65535, int(self.settings.get('upstream_http_connect_port', 0) or 0)),
             )
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return 0
 
     @upstream_http_connect_port.setter
@@ -1164,7 +1164,7 @@ class ConfigManager:
     def upstream_socks5_port(self) -> int:
         try:
             return max(0, min(65535, int(self.settings.get('upstream_socks5_port', 0) or 0)))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return 0
 
     @upstream_socks5_port.setter
@@ -1200,7 +1200,7 @@ class ConfigManager:
                     int(self.settings.get('vpn_compat_max_assetdelivery_connections', 16) or 16),
                 ),
             )
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return 16
 
     @vpn_compat_max_assetdelivery_connections.setter
@@ -1220,7 +1220,7 @@ class ConfigManager:
                     int(self.settings.get('vpn_compat_max_cdn_connections', 32) or 32),
                 ),
             )
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return 32
 
     @vpn_compat_max_cdn_connections.setter
