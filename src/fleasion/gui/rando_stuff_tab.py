@@ -592,10 +592,11 @@ class RandoStuffTab(QWidget):
     _PRIVATE_GAME_ENDPOINT = '/v1/join-private-game'
     _RESERVED_GAME_ENDPOINT = '/v1/join-reserved-game'
 
-    def __init__(self, parent=None, config_manager=None, proxy_master=None):
+    def __init__(self, parent=None, config_manager=None, proxy_master=None, env_lifecycle=None):
         super().__init__(parent)
         self._config = config_manager
         self._proxy_master = proxy_master
+        self._env_lifecycle = env_lifecycle
         self._qt_destroyed = False
         self.destroyed.connect(self._on_qt_destroyed)
         self._invoker = _Invoker(self)
@@ -674,7 +675,7 @@ class RandoStuffTab(QWidget):
     def _normalize_numeric_id(value) -> str | None:
         try:
             return str(int(str(value).strip()))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
 
     @classmethod
@@ -2134,7 +2135,7 @@ class RandoStuffTab(QWidget):
                     'accounts',
                     f'Launching Roblox URI to placeId={launch_place_id} (private server)',
                 )
-                launch_ok = launch_as_standard_user(roblox_player_uri)
+                launch_ok = self._launch_roblox_uri(exe, roblox_player_uri)
                 if not launch_ok:
                     log_buffer.log('accounts', 'Failed to launch Roblox URI without elevation')
             else:
@@ -2182,7 +2183,7 @@ class RandoStuffTab(QWidget):
                     )
                 else:
                     log_buffer.log('accounts', f'Launching Roblox URI to placeId={launch_place_id}')
-                launch_ok = launch_as_standard_user(roblox_player_uri)
+                launch_ok = self._launch_roblox_uri(exe, roblox_player_uri)
                 if not launch_ok:
                     log_buffer.log('accounts', 'Failed to launch Roblox URI without elevation')
             else:
@@ -2223,7 +2224,7 @@ class RandoStuffTab(QWidget):
             if ticket:
                 roblox_player_uri = _build_auth_ticket_app_uri(ticket)
                 log_buffer.log('accounts', 'Launching Roblox app URI for selected account')
-                launch_ok = launch_as_standard_user(roblox_player_uri)
+                launch_ok = self._launch_roblox_uri(exe, roblox_player_uri)
                 if not launch_ok:
                     log_buffer.log('accounts', 'Failed to launch Roblox app URI without elevation')
                     if IS_MACOS:
@@ -2253,6 +2254,26 @@ class RandoStuffTab(QWidget):
             log_buffer.log('accounts', f'Launched Roblox for account: {username}')
         else:
             log_buffer.log('accounts', f'Launch failed for account: {username}')
+
+    def _launch_roblox_uri(self, exe: str | None, uri: str) -> bool:
+        proxy_mode = getattr(self._config, 'proxy_mode', 'hosts')
+        proxy_enabled = getattr(self._config, 'proxy_features_enabled', True)
+        has_lifecycle = self._env_lifecycle is not None
+        if IS_MACOS and has_lifecycle and proxy_mode == 'env' and proxy_enabled:
+            log_buffer.log(
+                'Launcher',
+                f'Routing URI launch through Env Proxy lifecycle (exe={exe})',
+            )
+            from pathlib import Path
+            exe_path = Path(exe) if exe else None
+            return self._env_lifecycle.handle_player_launch(exe_path, uri)
+        log_buffer.log(
+            'Launcher',
+            f'URI launch bypassing Env Proxy '
+            f'(IS_MACOS={IS_MACOS}, has_lifecycle={has_lifecycle}, '
+            f'proxy_mode={proxy_mode}, proxy_enabled={proxy_enabled})',
+        )
+        return launch_as_standard_user(uri)
 
     def _write_cookie_to_dat(self, cookie: str):
         """Replace .ROBLOSECURITY in the platform client's local account store."""
