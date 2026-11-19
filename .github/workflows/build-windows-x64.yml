@@ -1,0 +1,52 @@
+name: Build Windows x64
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag to upload exe to'
+        required: true
+        default: 'v2.4.2b1'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        shell: pwsh
+        run: irm https://astral.sh/uv/install.ps1 | iex
+
+      - name: Sync dependencies
+        shell: pwsh
+        run: |
+          $env:PATH += ";$env:USERPROFILE\.local\bin"
+          uv sync --all-groups
+
+      - name: Build exe
+        shell: pwsh
+        run: |
+          $env:PATH += ";$env:USERPROFILE\.local\bin"
+          uv run build
+
+      - name: Rename exe to include architecture
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem dist\Fleasion*Windows*.exe | Select-Object -First 1
+          $newName = $exe.Name -replace 'Windows', 'Windows-x64'
+          Rename-Item $exe.FullName $newName
+          Write-Host "Renamed to: $newName"
+          Get-ChildItem dist\
+
+      - name: Upload to release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $exe = Get-ChildItem dist\Fleasion*Windows-x64*.exe | Select-Object -First 1
+          gh release upload ${{ github.event.inputs.release_tag }} $exe.FullName --clobber
+          Write-Host "Uploaded: $($exe.Name)"
