@@ -110,7 +110,7 @@ def _format_table_timestamp(value) -> str:
             time_part = time_part.rstrip('Z')
             time_part = time_part.split('.', 1)[0]
             return f'{date_part} {time_part}'
-    except ValueError, AttributeError:
+    except (ValueError, AttributeError):
         pass
     return text
 
@@ -5627,7 +5627,7 @@ class CacheViewerTab(QWidget):
                 text = data.decode(encoding)
                 parsed = json.loads(text)
                 return True, parsed
-            except UnicodeDecodeError, json.JSONDecodeError:
+            except (UnicodeDecodeError, json.JSONDecodeError):
                 continue
 
         return False, None

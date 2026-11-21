@@ -158,7 +158,7 @@ def _format_timestamp(value) -> str:
         return ''
     try:
         return datetime.fromtimestamp(value).strftime('%H:%M:%S.%f')[:-3]
-    except OSError, OverflowError, ValueError:
+    except (OSError, OverflowError, ValueError):
         return ''
 
 

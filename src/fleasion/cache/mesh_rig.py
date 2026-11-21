@@ -496,7 +496,7 @@ def has_embedded_rig(data: bytes) -> bool:
                 _map_weights(len(envelopes), envelopes, subsets)
                 valid_skinning = True
         return has_coremesh and valid_skinning
-    except MeshRigError, ValueError, struct.error:
+    except (MeshRigError, ValueError, struct.error):
         return False
 
 

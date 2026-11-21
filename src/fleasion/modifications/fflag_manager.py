@@ -312,7 +312,7 @@ class FastFlagManager:
             try:
                 try:
                     existing = json.loads(target.read_text(encoding='utf-8'))
-                except UnicodeDecodeError, json.JSONDecodeError:
+                except (UnicodeDecodeError, json.JSONDecodeError):
                     existing = {}
                 if not isinstance(existing, dict):
                     existing = {}

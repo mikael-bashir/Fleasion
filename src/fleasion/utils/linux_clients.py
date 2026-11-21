@@ -322,7 +322,7 @@ def query_default_roblox_handlers(
                 text=True,
                 timeout=5,
             )
-        except OSError, subprocess.SubprocessError:
+        except (OSError, subprocess.SubprocessError):
             continue
         handler = result.stdout.strip() if result.returncode == 0 else ''
         if handler and handler not in handlers:

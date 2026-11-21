@@ -331,7 +331,7 @@ class CacheManager:
                 text = data.decode(encoding)
                 json.loads(text)
                 return True
-            except UnicodeDecodeError, json.JSONDecodeError:
+            except (UnicodeDecodeError, json.JSONDecodeError):
                 continue
 
         return False

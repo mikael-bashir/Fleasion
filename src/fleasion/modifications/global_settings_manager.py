@@ -152,7 +152,7 @@ class GlobalSettingsManager:
                             if int_elem.get('name') == 'FramerateCap':
                                 try:
                                     return int(int_elem.text or 0)
-                                except ValueError, TypeError:
+                                except (ValueError, TypeError):
                                     return None
             return None
         except Exception as e:

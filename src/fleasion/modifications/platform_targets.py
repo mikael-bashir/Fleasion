@@ -161,7 +161,7 @@ def _read_zip_member(archive_path: Path, member: str) -> bytes | None:
     try:
         with zipfile.ZipFile(archive_path) as archive:
             return archive.read(member)
-    except KeyError, OSError, zipfile.BadZipFile:
+    except (KeyError, OSError, zipfile.BadZipFile):
         return None
 
 
@@ -233,7 +233,7 @@ def _read_sober_original_asset_directory(target_dir: str | Path) -> dict[str, by
                         result[name] = archive.read(member)
                     except KeyError:
                         continue
-        except OSError, zipfile.BadZipFile:
+        except (OSError, zipfile.BadZipFile):
             continue
     return result
 

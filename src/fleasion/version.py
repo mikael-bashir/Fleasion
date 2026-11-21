@@ -83,7 +83,7 @@ def _read_pyproject_version() -> str | None:
 
     try:
         return read_project_version(pyproject_path)
-    except InvalidVersion, ValueError:
+    except (InvalidVersion, ValueError):
         return None
 
 

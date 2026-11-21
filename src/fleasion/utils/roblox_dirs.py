@@ -71,7 +71,7 @@ def is_roblox_studio_resource_dir(path: Path) -> bool:
         return False
     try:
         resolved = path.resolve()
-    except OSError, ValueError:
+    except (OSError, ValueError):
         resolved = path
 
     if sys.platform == 'darwin':
@@ -102,7 +102,7 @@ def load_saved_roblox_dirs() -> list[Path]:
     try:
         with ROBLOX_DIRS_FILE.open('r', encoding='utf-8') as f:
             payload = json.load(f)
-    except json.JSONDecodeError, OSError:
+    except (json.JSONDecodeError, OSError):
         return []
 
     raw_dirs = payload.get('roblox_dirs', []) if isinstance(payload, dict) else []

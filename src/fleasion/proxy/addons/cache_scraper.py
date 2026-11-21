@@ -329,7 +329,7 @@ def _ktx2_pack_index(data: bytes) -> int | None:
             continue
         try:
             return int(value.rstrip(b'\x00').decode('ascii'))
-        except UnicodeDecodeError, ValueError:
+        except (UnicodeDecodeError, ValueError):
             return None
     return None
 
@@ -534,6 +534,70 @@ class CacheScraper:
 
         if tracked > 0:
             log_buffer.log('Cache', f'Tracking {format_count(tracked, "asset")} for caching')
+
+    # Called from server MITM thread for v3 assetdelivery batch responses
+
+    def process_v3_batch_response(self, resp_body: bytes) -> None:
+        """Stage 1 for /v3/assets/batch: extract from {"assets":[{assetId,assetTypeId,location},...]}."""
+        if not self.enabled or not resp_body:
+            return
+        try:
+            res_json = _loads(resp_body)
+        except Exception:
+            return
+        assets = res_json.get('assets') if isinstance(res_json, dict) else None
+        if not isinstance(assets, list):
+            return
+
+        tracked = 0
+        to_copy: list[tuple] = []
+
+        with self._lock:
+            generation = self._work_generation
+            for item in assets:
+                if not isinstance(item, dict):
+                    continue
+                asset_id = item.get('assetId')
+                location = item.get('location')
+                asset_type = item.get('assetTypeId')
+                if asset_id is None or location is None or asset_type is None:
+                    continue
+                base_url = location.split('?')[0]
+
+                if base_url in self._url_to_asset:
+                    continue
+                if asset_id not in self.cache_logs:
+                    self.cache_logs[asset_id] = {
+                        'location': location,
+                        'assetTypeId': asset_type,
+                    }
+                url_list = self._url_to_asset.setdefault(base_url, [])
+
+                cached_sibling = None
+                for sibling_id in url_list:
+                    sibling_info = self.cache_logs.get(sibling_id)
+                    if sibling_info and 'cached' in sibling_info:
+                        cached_sibling = sibling_id
+                        break
+                if cached_sibling is not None:
+                    self.cache_logs[asset_id]['cached'] = True
+                    to_copy.append((cached_sibling, asset_id, asset_type, location))
+
+                url_list.append(asset_id)
+                tracked += 1
+
+        for source_id, dest_id, asset_type, url in to_copy:
+            self._submit_background(
+                self._copy_cached_asset,
+                source_id,
+                dest_id,
+                asset_type,
+                url,
+                generation=generation,
+            )
+
+        if tracked > 0:
+            log_buffer.log('Cache', f'Tracking {format_count(tracked, "asset")} for caching (v3 batch)')
 
     # Called from server MITM thread for Roblox CDN responses
 

@@ -2256,6 +2256,9 @@ class RandoStuffTab(QWidget):
             log_buffer.log('accounts', f'Launch failed for account: {username}')
 
     def _launch_roblox_uri(self, exe: str | None, uri: str) -> bool:
+        # In Env Proxy mode the URI must go through handle_player_launch so the
+        # proxy env vars are injected before Roblox reads them.  In Hosts mode
+        # (or when no lifecycle is available) launch_as_standard_user suffices.
         proxy_mode = getattr(self._config, 'proxy_mode', 'hosts')
         proxy_enabled = getattr(self._config, 'proxy_features_enabled', True)
         has_lifecycle = self._env_lifecycle is not None

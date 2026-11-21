@@ -1411,7 +1411,7 @@ class ModPreviewDialog(QDialog):
                     pretty_json = json_module.dumps(parsed, indent=2)
                     viewer.setPlainText(pretty_json)
                     layout.addWidget(viewer)
-                except ValueError, UnicodeDecodeError:
+                except (ValueError, UnicodeDecodeError):
                     # Not JSON, treat as font file
                     from ..cache.font_viewer import FontViewerWidget
 
@@ -1970,7 +1970,7 @@ class FFlagBrowserDialog(QDialog):
             raw_flags = cached['flags']
             if not 0 <= age < cls._CACHE_TTL_SECONDS or not isinstance(raw_flags, dict):
                 return None
-        except OSError, ValueError, TypeError, AttributeError, KeyError, json.JSONDecodeError:
+        except (OSError, ValueError, TypeError, AttributeError, KeyError, json.JSONDecodeError):
             return None
 
         flags: dict[str, str | None] = {}
@@ -2044,7 +2044,7 @@ class FFlagBrowserDialog(QDialog):
                     url = futures[future]
                     try:
                         settings = self._extract_flags(json.loads(future.result()))
-                    except OSError, ValueError, json.JSONDecodeError:
+                    except (OSError, ValueError, json.JSONDecodeError):
                         # Some platform/channel combinations are intentionally
                         # unavailable. The remaining published endpoints are
                         # still useful to the browser.
@@ -2060,7 +2060,7 @@ class FFlagBrowserDialog(QDialog):
             ):
                 try:
                     tracker_flags = self._extract_tracker_flags(http_get(tracker_url, timeout=20))
-                except OSError, ValueError:
+                except (OSError, ValueError):
                     # A tracker snapshot should add names when available, but a
                     # temporary GitHub failure must not hide published values.
                     continue
@@ -4673,7 +4673,7 @@ def _relative_target_path_for_resource_file(
             root = Path(raw_root).expanduser().resolve(strict=True)
             rel = selected_resolved.relative_to(root)
             normalized = normalise_target_path(rel.as_posix())
-        except OSError, ValueError:
+        except (OSError, ValueError):
             continue
         return normalized.as_posix()
     return None

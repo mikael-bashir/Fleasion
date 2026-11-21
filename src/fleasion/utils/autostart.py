@@ -77,7 +77,7 @@ def _windows_run_entry_matches(launch_info: dict) -> bool:
         ) as key:
             value, value_type = winreg.QueryValueEx(key, _WINDOWS_RUN_VALUE)
         return value_type == winreg.REG_SZ and value == _windows_run_command(launch_info)
-    except ImportError, OSError:
+    except (ImportError, OSError):
         return False
 
 
