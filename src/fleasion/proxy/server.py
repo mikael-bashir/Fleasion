@@ -71,6 +71,8 @@ BASE_INTERCEPT_HOSTS: frozenset = frozenset({ASSET_DELIVERY_HOST, GAMEJOIN_HOST,
 
 
 def _is_cdn_host(host: str) -> bool:
+    # CDN_HOSTS covers only the two named hosts; *.rbxcdn.com is a wildcard family
+    # (e.g. c0.rbxcdn.com, c1.rbxcdn.com, …) that must be matched by suffix.
     return host in CDN_HOSTS or host.endswith('.rbxcdn.com')
 USERNAME_SPOOFER_INTERCEPT_HOSTS: frozenset = frozenset({PROFILE_API_HOST})
 CUSTOM_FFLAGS_INTERCEPT_HOSTS: frozenset = CLIENT_SETTINGS_HOSTS
@@ -1400,6 +1402,9 @@ class FleasionProxy:
             )
             return
         if name in self._host_ssl_ctxs:
+            # Bug fix: the context was looked up but never assigned, so every
+            # connection after the first still used the default multi-host cert,
+            # causing TLS verification failures on macOS (strict CA pinning).
             ssl_obj.context = self._host_ssl_ctxs[name]
             self._log_sni_once(
                 f'known:{name}',
@@ -2529,6 +2534,8 @@ class FleasionProxy:
                     hold=self._intercept_all_hosts and self._intercept_matches(host, path),
                 )
                 is_batch = host == ASSET_DELIVERY_HOST and b'/v1/assets/batch' in req_first
+                # v3 batch format includes assetId in the response body, so we
+                # can process it without needing to correlate with the request.
                 is_batch_v3 = host == ASSET_DELIVERY_HOST and b'/v3/assets/batch' in req_first
                 bypass_custom_fflags = (
                     req_headers.get(_BROWSER_BYPASS_CUSTOM_FFLAGS_HEADER, b'').strip() == b'1'

@@ -2226,6 +2226,9 @@ class RandoStuffTab(QWidget):
                 log_buffer.log('accounts', 'Launching Roblox app URI for selected account')
                 lifecycle = getattr(self._roblox_monitor, 'env_lifecycle', None)
                 config = self._config
+                # In Env Proxy mode the URI must go through handle_player_launch
+                # so the proxy env vars are injected before Roblox reads them.
+                # In Hosts mode launch_as_standard_user is sufficient.
                 if (
                     lifecycle is not None
                     and config is not None
