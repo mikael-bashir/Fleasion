@@ -592,10 +592,11 @@ class RandoStuffTab(QWidget):
     _PRIVATE_GAME_ENDPOINT = '/v1/join-private-game'
     _RESERVED_GAME_ENDPOINT = '/v1/join-reserved-game'
 
-    def __init__(self, parent=None, config_manager=None, proxy_master=None):
+    def __init__(self, parent=None, config_manager=None, proxy_master=None, roblox_monitor=None):
         super().__init__(parent)
         self._config = config_manager
         self._proxy_master = proxy_master
+        self._roblox_monitor = roblox_monitor
         self._qt_destroyed = False
         self.destroyed.connect(self._on_qt_destroyed)
         self._invoker = _Invoker(self)
@@ -674,7 +675,7 @@ class RandoStuffTab(QWidget):
     def _normalize_numeric_id(value) -> str | None:
         try:
             return str(int(str(value).strip()))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
 
     @classmethod
@@ -2223,7 +2224,25 @@ class RandoStuffTab(QWidget):
             if ticket:
                 roblox_player_uri = _build_auth_ticket_app_uri(ticket)
                 log_buffer.log('accounts', 'Launching Roblox app URI for selected account')
-                launch_ok = launch_as_standard_user(roblox_player_uri)
+                lifecycle = getattr(self._roblox_monitor, 'env_lifecycle', None)
+                config = self._config
+                if (
+                    lifecycle is not None
+                    and config is not None
+                    and getattr(config, 'proxy_mode', 'hosts') == 'env'
+                    and getattr(config, 'proxy_features_enabled', False)
+                    and self._proxy_master is not None
+                ):
+                    log_buffer.log('accounts', 'Routing launch through Env Proxy lifecycle')
+                    import threading
+                    threading.Thread(
+                        target=lifecycle.handle_player_launch,
+                        args=(None, roblox_player_uri),
+                        daemon=True,
+                    ).start()
+                    launch_ok = True
+                else:
+                    launch_ok = launch_as_standard_user(roblox_player_uri)
                 if not launch_ok:
                     log_buffer.log('accounts', 'Failed to launch Roblox app URI without elevation')
                     if IS_MACOS:

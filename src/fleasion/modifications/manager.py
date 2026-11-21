@@ -137,7 +137,7 @@ def _instance_attr(obj, name: str, default=None):
     """Read attributes safely on partially initialized QObject test doubles."""
     try:
         return object.__getattribute__(obj, name)
-    except AttributeError, RuntimeError:
+    except (AttributeError, RuntimeError):
         return default
 
 
@@ -162,7 +162,7 @@ def _find_roblox_dirs() -> list[Path]:
                 return
             try:
                 key = str(path.resolve()).lower()
-            except OSError, ValueError:
+            except (OSError, ValueError):
                 key = str(path).lower()
             if key in seen:
                 return
@@ -221,12 +221,12 @@ def _find_roblox_dirs() -> list[Path]:
         def _has_player(path: Path) -> bool:
             try:
                 return os.path.isfile(os.path.join(path, ROBLOX_PROCESS))
-            except OSError, ValueError:
+            except (OSError, ValueError):
                 return False
 
         try:
             root_is_dir = root.is_dir()
-        except OSError, ValueError:
+        except (OSError, ValueError):
             return results
         if root_is_dir and _has_player(root):
             results.append(root)
@@ -241,7 +241,7 @@ def _find_roblox_dirs() -> list[Path]:
                         results.append(entry_path)
                     if depth < max_depth:
                         _recurse(entry_path, depth + 1)
-            except OSError, ValueError:
+            except (OSError, ValueError):
                 pass
 
         if root_is_dir:
@@ -274,7 +274,7 @@ def _find_roblox_dirs() -> list[Path]:
                                 else:
                                     for d in _scan_for_exe(p, 1):
                                         _add(d)
-                        except OSError, ValueError:
+                        except (OSError, ValueError):
                             pass
                         # One nested level
                         j = 0
@@ -299,11 +299,11 @@ def _find_roblox_dirs() -> list[Path]:
                                         else:
                                             for d in _scan_for_exe(p2, 1):
                                                 _add(d)
-                            except OSError, ValueError:
+                            except (OSError, ValueError):
                                 pass
-                except OSError, ValueError:
+                except (OSError, ValueError):
                     pass
-    except OSError, ValueError:
+    except (OSError, ValueError):
         pass
 
     # 2. MS Store: C:\XboxGames\Roblox
@@ -322,7 +322,7 @@ def _find_roblox_dirs() -> list[Path]:
             if exe_path is not None:
                 for d in _scan_for_exe(exe_path.parent, 2):
                     _add(d)
-    except OSError, ValueError:
+    except (OSError, ValueError):
         pass
 
     # 4. Program Files (x86) Roblox installs
@@ -581,7 +581,7 @@ class ModificationManager(QObject):
             return {}
         try:
             payload = json.loads(Path(state_file).read_text(encoding='utf-8'))
-        except OSError, ValueError, TypeError, json.JSONDecodeError:
+        except (OSError, ValueError, TypeError, json.JSONDecodeError):
             return {}
         if not isinstance(payload, dict):
             return {}
@@ -589,7 +589,7 @@ class ModificationManager(QObject):
         for raw_path, raw_mode in payload.items():
             try:
                 modes[Path(raw_path)] = int(raw_mode)
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 continue
         return modes
 
@@ -801,7 +801,7 @@ class ModificationManager(QObject):
                 ):
                     data['global_settings']['framerate_cap'] = legacy_framerate
                 return data
-            except json.JSONDecodeError, OSError:
+            except (json.JSONDecodeError, OSError):
                 pass
         return {
             'entries': [],
@@ -1452,7 +1452,7 @@ class ModificationManager(QObject):
             value = self.global_settings_manager.read_framerate_cap()
         try:
             return 0 if value in (None, '', 'Default') else int(value)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return 0
 
     @framerate_cap.setter

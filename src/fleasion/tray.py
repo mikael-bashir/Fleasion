@@ -458,6 +458,19 @@ class SystemTray:
         self.auto_delete_cache_action.triggered.connect(self._toggle_auto_delete_cache)
         convenience_menu.addAction(self.auto_delete_cache_action)
 
+        # Auto-intercept externally-launched Roblox (macOS only)
+        self.auto_intercept_external_action = QAction(
+            'Auto-intercept external Roblox launch', convenience_menu
+        )
+        self.auto_intercept_external_action.setCheckable(True)
+        self.auto_intercept_external_action.setChecked(
+            self.config_manager.auto_intercept_external_roblox
+        )
+        self.auto_intercept_external_action.triggered.connect(
+            self._toggle_auto_intercept_external_roblox
+        )
+        convenience_menu.addAction(self.auto_intercept_external_action)
+
         # Clear cache on launch
         self.clear_cache_action = QAction(tr('ui.tray.clear_cache_on_launch'), convenience_menu)
         self.clear_cache_action.setCheckable(True)
@@ -711,6 +724,12 @@ class SystemTray:
         self.config_manager.auto_delete_cache_on_exit = new_state
         self.auto_delete_cache_action.setChecked(new_state)
         self._refresh_settings_tab()
+
+    def _toggle_auto_intercept_external_roblox(self):
+        """Toggle whether Fleasion intercepts Roblox launched outside Fleasion."""
+        new_state = not self.config_manager.auto_intercept_external_roblox
+        self.config_manager.auto_intercept_external_roblox = new_state
+        self.auto_intercept_external_action.setChecked(new_state)
 
     def _toggle_run_on_boot(self):
         """Toggle run-on-boot for the current platform."""

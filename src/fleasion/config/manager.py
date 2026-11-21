@@ -34,7 +34,7 @@ def _normalise_linux_client(value: str | None) -> str:
         from ..utils.linux_clients import LINUX_CLIENTS_BY_KEY
 
         supported = LINUX_CLIENTS_BY_KEY
-    except ImportError, AttributeError:
+    except (ImportError, AttributeError):
         # Keep isolated config loading and recovery usable even when platform
         # modules are unavailable. Sober is the compatibility implementation.
         supported = {'sober': None}
@@ -88,7 +88,7 @@ def local_replacement_path_for_storage(value: str | Path) -> str:
     path = Path(value)
     try:
         relative = path.resolve().relative_to(CONFIGS_FOLDER.resolve())
-    except OSError, ValueError:
+    except (OSError, ValueError):
         return str(path)
 
     folder_depth = len(relative.parts) - 1
@@ -269,6 +269,7 @@ DEFAULT_SETTINGS = {
     'linux_client': 'auto',
     'env_proxy_migration_v1_complete': False,
     'lock_roblox_files_read_only': False,
+    'auto_intercept_external_roblox': False,
     'read_only_lock_migration_v1_complete': False,
     'close_env_proxy_roblox_on_exit': True,
     'custom_fflags_enabled': False,
@@ -572,7 +573,7 @@ class ConfigManager:
                     loaded['last_config'] = loaded['active_config']
                     del loaded['active_config']
                 return {**DEFAULT_SETTINGS, **loaded}
-            except json.JSONDecodeError, OSError, UnicodeDecodeError:
+            except (json.JSONDecodeError, OSError, UnicodeDecodeError):
                 pass
         return deepcopy(DEFAULT_SETTINGS)
 
@@ -641,7 +642,7 @@ class ConfigManager:
             try:
                 text = raw.decode(encoding)
                 loaded = _json_loads(text)
-            except LookupError, UnicodeDecodeError, json.JSONDecodeError:
+            except (LookupError, UnicodeDecodeError, json.JSONDecodeError):
                 continue
             return loaded, True
 
@@ -676,7 +677,7 @@ class ConfigManager:
 
         try:
             loaded, _recovered = self._decode_json_bytes(raw)
-        except UnicodeDecodeError, json.JSONDecodeError:
+        except (UnicodeDecodeError, json.JSONDecodeError):
             if _is_probably_binary(raw):
                 return ConfigFileInspection('binary')
             return ConfigFileInspection('invalid')
@@ -749,7 +750,7 @@ class ConfigManager:
                 loaded = self._normalize_config_data(self._load_json_file(Path(path)))
                 self._config_data_cache[name] = (self._file_signature(path), loaded)
                 return loaded
-            except json.JSONDecodeError, OSError, UnicodeDecodeError:
+            except (json.JSONDecodeError, OSError, UnicodeDecodeError):
                 pass
         loaded = {'replacement_rules': []}
         self._config_data_cache[name] = (signature, loaded)
@@ -921,6 +922,16 @@ class ConfigManager:
     @lock_roblox_files_read_only.setter
     def lock_roblox_files_read_only(self, value: bool):
         self.settings['lock_roblox_files_read_only'] = bool(value)
+        self._save_settings()
+
+    @property
+    def auto_intercept_external_roblox(self) -> bool:
+        """Whether Fleasion should automatically intercept externally-launched Roblox."""
+        return bool(self.settings.get('auto_intercept_external_roblox', False))
+
+    @auto_intercept_external_roblox.setter
+    def auto_intercept_external_roblox(self, value: bool):
+        self.settings['auto_intercept_external_roblox'] = bool(value)
         self._save_settings()
 
     @property
@@ -1125,7 +1136,7 @@ class ConfigManager:
                 0,
                 min(65535, int(self.settings.get('upstream_http_connect_port', 0) or 0)),
             )
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return 0
 
     @upstream_http_connect_port.setter
@@ -1164,7 +1175,7 @@ class ConfigManager:
     def upstream_socks5_port(self) -> int:
         try:
             return max(0, min(65535, int(self.settings.get('upstream_socks5_port', 0) or 0)))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return 0
 
     @upstream_socks5_port.setter
@@ -1200,7 +1211,7 @@ class ConfigManager:
                     int(self.settings.get('vpn_compat_max_assetdelivery_connections', 16) or 16),
                 ),
             )
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return 16
 
     @vpn_compat_max_assetdelivery_connections.setter
@@ -1220,7 +1231,7 @@ class ConfigManager:
                     int(self.settings.get('vpn_compat_max_cdn_connections', 32) or 32),
                 ),
             )
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return 32
 
     @vpn_compat_max_cdn_connections.setter

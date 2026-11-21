@@ -92,10 +92,10 @@ def tr(identifier: str, /, **values: Any) -> str:
         return text
     try:
         return text.format(**values)
-    except KeyError, IndexError, ValueError:
+    except (KeyError, IndexError, ValueError):
         try:
             return english.format(**values)
-        except KeyError, IndexError, ValueError:
+        except (KeyError, IndexError, ValueError):
             return english
 
 

@@ -1611,7 +1611,7 @@ def _read_restart_marker_value(token: str, phase: str) -> int | None:
     try:
         raw_value = marker.read_text(encoding='utf-8').strip()
         value = int(raw_value)
-    except OSError, ValueError:
+    except (OSError, ValueError):
         return None
     return value if value > 0 else None
 
@@ -1916,7 +1916,7 @@ def _terminate_popen_child(process) -> None:
         try:
             process.kill()
             process.wait(timeout=2.0)
-        except OSError, subprocess.TimeoutExpired:
+        except (OSError, subprocess.TimeoutExpired):
             pass
     except OSError:
         pass
@@ -3376,14 +3376,18 @@ class RobloxExitMonitor(QObject):
 
     def _schedule_macos_plain_launch_fallback(self, exe_path: Path) -> None:
         """Keep ordinary Dock/Finder launches on the existing Env Proxy path."""
+        if not self.config_manager.auto_intercept_external_roblox:
+            log_buffer.log('DBG', '[FALLBACK] auto_intercept_external_roblox=False → skipped')
+            return
         if self._macos_uri_interceptor is None:
+            log_buffer.log('DBG', '[FALLBACK] no uri_interceptor → skipped')
             return
         identity = get_roblox_process_identity()
         if not isinstance(identity, tuple) or not identity:
             return
         try:
             pid = int(identity[0])
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return
         with self._macos_plain_launch_lock:
             if pid in self._macos_plain_launches:
@@ -3407,7 +3411,7 @@ class RobloxExitMonitor(QObject):
             try:
                 if int(current_identity[0]) != pid:
                     return
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 return
             if not self._macos_uri_interception_armed():
                 return
@@ -3474,6 +3478,7 @@ class RobloxExitMonitor(QObject):
                     )
             else:
                 exe_path = get_roblox_player_exe_path()
+                log_buffer.log('DBG', f'[LAUNCH DETECT] Roblox new launch, exe_path={exe_path}')
                 if exe_path is None:
                     # Process may still be initializing — retry for up to 10 s
                     for _ in range(10):
@@ -3483,6 +3488,8 @@ class RobloxExitMonitor(QObject):
                             break
                 if exe_path is not None:
                     proxy_features_enabled = self.config_manager.proxy_features_enabled
+                    proxy_mode = self.config_manager.proxy_mode
+                    log_buffer.log('DBG', f'[LAUNCH DETECT] proxy_mode={proxy_mode} proxy_features_enabled={proxy_features_enabled} proxy_master={self._proxy_master is not None} env_lifecycle={self.env_lifecycle is not None}')
                     if self._mod_manager is not None:
                         self._mod_manager.refresh_roblox_dirs(reapply_if_changed=True)
                     if (
@@ -3546,12 +3553,15 @@ class RobloxExitMonitor(QObject):
                     ):
                         if self.env_lifecycle is not None:
                             if sys.platform == 'darwin':
+                                log_buffer.log('DBG', '[LAUNCH DETECT] macOS env proxy path → _schedule_macos_plain_launch_fallback')
                                 self._schedule_macos_plain_launch_fallback(exe_path)
                             else:
                                 run_in_thread(self.env_lifecycle.handle_player_launch)(exe_path)
                     elif self._proxy_master is not None and proxy_features_enabled:
+                        log_buffer.log('DBG', '[LAUNCH DETECT] hosts proxy path → refresh_and_restart_roblox')
                         run_in_thread(self._proxy_master.refresh_and_restart_roblox)(exe_path)
                     elif self._proxy_master is None and proxy_features_enabled:
+                        log_buffer.log('DBG', '[LAUNCH DETECT] no proxy_master → check_and_patch_running_roblox_ca')
                         run_in_thread(check_and_patch_running_roblox_ca)(exe_path)
                     elif not proxy_features_enabled:
                         log_buffer.log(
@@ -3750,7 +3760,7 @@ def _other_fleasion_pids() -> list:
                 try:
                     pid_text, _ppid_text, command = raw.strip().split(None, 2)
                     pid = int(pid_text)
-                except ValueError, TypeError:
+                except (ValueError, TypeError):
                     continue
                 if pid not in safe_pids and _looks_like_fleasion_gui_command(command):
                     pids.append(pid)
@@ -3777,7 +3787,7 @@ def _other_fleasion_pids() -> list:
                         pid = int(parts[1])
                         if pid not in safe_pids:
                             pids.append(pid)
-                    except ValueError, IndexError:
+                    except (ValueError, IndexError):
                         pass
         else:
             ps_cmd = (
@@ -3804,7 +3814,7 @@ def _other_fleasion_pids() -> list:
                         continue
                     if 'launcher.py' in cmdline or 'fleasion' in cmdline:
                         pids.append(pid)
-            except json.JSONDecodeError, TypeError, ValueError:
+            except (json.JSONDecodeError, TypeError, ValueError):
                 pass
     except Exception:
         pass
@@ -4514,7 +4524,7 @@ def main():
     def _on_commit_data(_session):
         try:
             env_lifecycle.cancel()
-        except NameError, AttributeError:
+        except (NameError, AttributeError):
             pass
         mod_manager.clear_managed_file_read_only()
         proxy_master.stop()

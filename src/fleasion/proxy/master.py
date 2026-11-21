@@ -1232,7 +1232,7 @@ def _other_proxy_owner_alive() -> bool:
     try:
         pid = int(_PROXY_OWNER_PID_FILE.read_text().strip())
         return pid != os.getpid() and _pid_is_alive(pid)
-    except OSError, ValueError:
+    except (OSError, ValueError):
         return False
 
 
@@ -2653,7 +2653,7 @@ def _find_roblox_dirs(*, include_studio: bool = True) -> list:
                             try:
                                 with winreg.OpenKey(sk, sub) as ssk:
                                     _check_player_path_key(ssk)
-                            except OSError, ValueError:
+                            except (OSError, ValueError):
                                 pass
                 except (OSError, ValueError):
                     pass
@@ -2695,7 +2695,7 @@ def _find_roblox_dirs(*, include_studio: bool = True) -> list:
                         for d in _scan_for_exe(exe_dir, 2):
                             active_found += 1
                             _add(d, 'Active Roblox protocol')
-            except OSError, ValueError:
+            except (OSError, ValueError):
                 pass
     except (OSError, ValueError):
         pass
@@ -2746,7 +2746,7 @@ def _find_roblox_dirs(*, include_studio: bool = True) -> list:
                         for d in _scan_for_exe(exe_dir, 2):
                             studio_found += 1
                             _add(d, 'Active Studio protocol')
-            except OSError, ValueError:
+            except (OSError, ValueError):
                 pass
     except (OSError, ValueError):
         pass
@@ -3805,7 +3805,7 @@ def _selected_linux_client_installation():
         from ..utils.platform_linux import get_selected_linux_client_installation
 
         return get_selected_linux_client_installation()
-    except OSError, RuntimeError, ValueError:
+    except (OSError, RuntimeError, ValueError):
         return None
 
 
@@ -6163,7 +6163,7 @@ class ProxyMaster:
         # Run until the server is stopped
         try:
             await self._proxy.serve_forever()
-        except asyncio.CancelledError, Exception:
+        except (asyncio.CancelledError, Exception):
             pass  # Normal shutdown path
         finally:
             hosts_ready_event = getattr(self, '_hosts_proxy_ready', None)

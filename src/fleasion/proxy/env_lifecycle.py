@@ -130,7 +130,10 @@ class EnvProxyLifecycleController:
         player_already_stopped: bool = False,
     ) -> bool:
         """Convert one Player launch and keep its CA healthy for ten seconds."""
-        if not self._enabled() or not self._operation_lock.acquire(blocking=False):
+        enabled = self._enabled()
+        lock_acquired = enabled and self._operation_lock.acquire(blocking=False)
+        log_buffer.log('DBG', f'[ENV_LIFECYCLE] handle_player_launch: enabled={enabled} lock_acquired={lock_acquired}')
+        if not enabled or not lock_acquired:
             return False
         intentional_relaunch_marked = False
         try:

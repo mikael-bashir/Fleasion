@@ -425,7 +425,7 @@ def _parse_markers(data: bytes, curve_name: str) -> list:
             value = data[offset : offset + str_len].decode('utf-8', errors='replace')
             offset += str_len
             markers.append((t, curve_name, value))
-    except struct.error, UnicodeDecodeError:
+    except (struct.error, UnicodeDecodeError):
         pass
     return markers
 

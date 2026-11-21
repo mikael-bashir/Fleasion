@@ -55,7 +55,7 @@ def validate_font_bytes(data: bytes) -> bool:
 def _load_generated_family_names(marker_path: Path) -> set[str]:
     try:
         value = json.loads(marker_path.read_text(encoding='utf-8'))
-    except OSError, json.JSONDecodeError:
+    except (OSError, json.JSONDecodeError):
         return set()
     if not isinstance(value, list):
         return set()
@@ -70,7 +70,7 @@ def _save_generated_family_names(marker_path: Path, names: set[str]) -> None:
     if not names:
         try:
             marker_path.unlink()
-        except FileNotFoundError, OSError:
+        except (FileNotFoundError, OSError):
             pass
         return
     marker_path.parent.mkdir(parents=True, exist_ok=True)
@@ -138,7 +138,7 @@ def apply_custom_font(
                     continue
                 try:
                     family = json.loads(source.decode('utf-8'))
-                except UnicodeDecodeError, json.JSONDecodeError:
+                except (UnicodeDecodeError, json.JSONDecodeError):
                     continue
                 generated_names.add(name)
                 # Persist ownership before creating the overlay file so a
@@ -152,7 +152,7 @@ def apply_custom_font(
                 try:
                     with json_path.open('r', encoding='utf-8') as fp:
                         family = json.load(fp)
-                except json.JSONDecodeError, OSError:
+                except (json.JSONDecodeError, OSError):
                     continue
 
             changed = False
@@ -191,7 +191,7 @@ def restore_font_families(
             dst_font.unlink()
         try:
             generated_font_marker.unlink()
-        except FileNotFoundError, OSError:
+        except (FileNotFoundError, OSError):
             pass
 
         # Restore family JSONs that predated Fleasion.

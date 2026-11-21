@@ -188,7 +188,7 @@ def _configured_linux_client_preference() -> str:
     try:
         payload = json.loads(CONFIG_FILE.read_text(encoding='utf-8'))
         value = str(payload.get('linux_client', 'auto') if isinstance(payload, dict) else 'auto')
-    except OSError, UnicodeDecodeError, json.JSONDecodeError:
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         value = 'auto'
     return _normalized_linux_client_preference(value)
 
@@ -262,7 +262,7 @@ def sober_main_process() -> tuple[int, float] | None:
     """
     try:
         ticks_per_second = float(os.sysconf('SC_CLK_TCK'))
-    except AttributeError, OSError, ValueError:
+    except (AttributeError, OSError, ValueError):
         return None
     if ticks_per_second <= 0:
         return None
@@ -278,7 +278,7 @@ def sober_main_process() -> tuple[int, float] | None:
             # remaining fields begin at field 3, so starttime (field 22) is 19.
             fields = stat_text.rsplit(')', 1)[1].split()
             start_ticks = int(fields[19])
-        except IndexError, OSError, ValueError:
+        except (IndexError, OSError, ValueError):
             continue
         return pid, start_ticks / ticks_per_second
     return None
@@ -791,7 +791,7 @@ def _read_linux_proxy_override_state() -> str | None:
         if LINUX_PROXY_OVERRIDE_STATE.is_symlink():
             return None
         payload = json.loads(LINUX_PROXY_OVERRIDE_STATE.read_text(encoding='utf-8'))
-    except OSError, UnicodeError, json.JSONDecodeError:
+    except (OSError, UnicodeError, json.JSONDecodeError):
         return None
     key = payload.get('client') if isinstance(payload, dict) else None
     return key if key in LINUX_CLIENTS_BY_KEY else None

@@ -68,6 +68,10 @@ CLIENT_SETTINGS_HOSTS: frozenset = frozenset(
 )
 CDN_HOSTS: frozenset = frozenset({'fts.rbxcdn.com', 'contentdelivery.roblox.com'})
 BASE_INTERCEPT_HOSTS: frozenset = frozenset({ASSET_DELIVERY_HOST, GAMEJOIN_HOST, *CDN_HOSTS})
+
+
+def _is_cdn_host(host: str) -> bool:
+    return host in CDN_HOSTS or host.endswith('.rbxcdn.com')
 USERNAME_SPOOFER_INTERCEPT_HOSTS: frozenset = frozenset({PROFILE_API_HOST})
 CUSTOM_FFLAGS_INTERCEPT_HOSTS: frozenset = CLIENT_SETTINGS_HOSTS
 INTERCEPT_HOSTS: frozenset = (
@@ -84,6 +88,21 @@ PROXY_TLS_MAX_VERSION = ssl.TLSVersion.TLSv1_2
 
 _ZSTD_MAGIC = b'\x28\xb5\x2f\xfd'
 _GZIP_MAGIC = b'\x1f\x8b'
+
+# Roblox connectivity-check hosts that send 1px.gif pings.  These IPs are
+# frequently unreachable from non-US networks.  Rather than letting the
+# upstream timeout surface as a 502 (which makes Roblox show "Connection
+# Error"), we serve a valid local response so the check always passes.
+_CONNECTIVITY_CHECK_HOSTS: frozenset = frozenset({
+    'silver.roblox.com',
+    'gold.roblox.com',
+    'pulsar.roblox.com',
+})
+# Minimal 1×1 transparent GIF (43 bytes)
+_TRANSPARENT_1PX_GIF = (
+    b'GIF89a\x01\x00\x01\x00\x80\x00\x00\xff\xff\xff\x00\x00\x00'
+    b'!\xf9\x04\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;'
+)
 _DCZ_DICTIONARY_PATH_RE = re.compile(r'/([0-9a-f]{64})\.dcz(?:$|[?])', re.IGNORECASE)
 
 
@@ -1175,7 +1194,7 @@ class _FlowResponse:
         parts = status_line.split(b' ', 2)
         try:
             self.status_code: int = int(parts[1])
-        except IndexError, ValueError:
+        except (IndexError, ValueError):
             self.status_code = 200
         self.content: bytes = body
 
@@ -1381,9 +1400,10 @@ class FleasionProxy:
             )
             return
         if name in self._host_ssl_ctxs:
+            ssl_obj.context = self._host_ssl_ctxs[name]
             self._log_sni_once(
                 f'known:{name}',
-                f'SNI matched {name}; using default multi-host certificate',
+                f'SNI matched {name}; using cached host certificate',
             )
             return
         if name and self._intercept_all_hosts:
@@ -2057,7 +2077,7 @@ class FleasionProxy:
 
         try:
             await self._http_session(result, reader, writer, host)
-        except ConnectionResetError, BrokenPipeError, asyncio.IncompleteReadError:
+        except (ConnectionResetError, BrokenPipeError, asyncio.IncompleteReadError):
             pass
         except Exception as exc:
             log_buffer.log('Proxy', f'Session error for {host}: {exc}')
@@ -2148,7 +2168,7 @@ class FleasionProxy:
 
         try:
             await self._http_session(first_tls_request, reader, writer, host)
-        except ConnectionResetError, BrokenPipeError, asyncio.IncompleteReadError:
+        except (ConnectionResetError, BrokenPipeError, asyncio.IncompleteReadError):
             pass
         except Exception as exc:
             log_buffer.log('Proxy', f'Explicit proxy session error for {host}: {exc}')
@@ -2182,7 +2202,7 @@ class FleasionProxy:
                 log_entry['ms'] = round((time.time() - start) * 1000)
             try:
                 await client_writer.drain()
-            except ConnectionResetError, BrokenPipeError, asyncio.IncompleteReadError, OSError:
+            except (ConnectionResetError, BrokenPipeError, asyncio.IncompleteReadError, OSError):
                 pass
             finally:
                 client_writer.close()
@@ -2193,7 +2213,7 @@ class FleasionProxy:
         client_writer.write(b'HTTP/1.1 200 Connection Established\r\nProxy-Agent: Fleasion\r\n\r\n')
         try:
             await client_writer.drain()
-        except ConnectionResetError, BrokenPipeError, asyncio.IncompleteReadError, OSError:
+        except (ConnectionResetError, BrokenPipeError, asyncio.IncompleteReadError, OSError):
             # Roblox can close a CONNECT socket while the response is in flight
             # during a failed launch. This is a client disconnect, not a proxy
             # crash, so do not emit an unhandled callback traceback.
@@ -2214,7 +2234,7 @@ class FleasionProxy:
                     if track and log_entry is not None:
                         log_entry['size'] = log_entry.get('size', 0) + len(data)
                         log_entry['ms'] = round((time.time() - start) * 1000)
-            except ConnectionResetError, BrokenPipeError, asyncio.IncompleteReadError, OSError:
+            except (ConnectionResetError, BrokenPipeError, asyncio.IncompleteReadError, OSError):
                 pass
             finally:
                 try:
@@ -2509,6 +2529,7 @@ class FleasionProxy:
                     hold=self._intercept_all_hosts and self._intercept_matches(host, path),
                 )
                 is_batch = host == ASSET_DELIVERY_HOST and b'/v1/assets/batch' in req_first
+                is_batch_v3 = host == ASSET_DELIVERY_HOST and b'/v3/assets/batch' in req_first
                 bypass_custom_fflags = (
                     req_headers.get(_BROWSER_BYPASS_CUSTOM_FFLAGS_HEADER, b'').strip() == b'1'
                 )
@@ -2541,7 +2562,7 @@ class FleasionProxy:
                 ):
                     upstream_req_headers = _without_conditional_client_settings_headers(req_headers)
 
-                if host == ASSET_DELIVERY_HOST or host in CDN_HOSTS:
+                if host == ASSET_DELIVERY_HOST or _is_cdn_host(host):
                     self._note_asset_traffic()
 
                 # ── TextureStripper: CDN short-circuit (replace before upstream) ──
@@ -2554,7 +2575,7 @@ class FleasionProxy:
                 # Without this, unreplaced assets pass through and Roblox caches them,
                 # requiring multiple rejoins to achieve full replacement coverage.
                 short_circuit = None
-                if host in CDN_HOSTS:
+                if _is_cdn_host(host):
                     short_circuit = self.texture_stripper.check_cdn_request(host, path)
                     if short_circuit is None and self.texture_stripper.has_pending():
                         # Yield to event loop in short increments, retrying up to ~600ms.
@@ -2726,6 +2747,24 @@ class FleasionProxy:
                         up_writer.write(
                             _reassemble_raw_request(req_first, req_headers, req_body_raw)
                         )
+                elif path.endswith('/1px.gif'):
+                    # Roblox 1px.gif connectivity pings (silver/gold/pulsar and
+                    # any IP-encoded endpoint host): return a local 200 so
+                    # Roblox doesn't receive a 502 from an upstream timeout and
+                    # show "Connection Error" on networks where these IPs are
+                    # unreachable.
+                    _gif_resp = (
+                        b'HTTP/1.1 200 OK\r\n'
+                        b'Content-Type: image/gif\r\n'
+                        b'Content-Length: ' + str(len(_TRANSPARENT_1PX_GIF)).encode('ascii') + b'\r\n'
+                        b'Connection: keep-alive\r\n\r\n'
+                        + _TRANSPARENT_1PX_GIF
+                    )
+                    writer.write(_gif_resp)
+                    await writer.drain()
+                    if not _keep_alive(req_first, req_headers):
+                        break
+                    continue
                 else:
                     # Forward request as-is.
                     if not await ensure_upstream(path):
@@ -2745,7 +2784,7 @@ class FleasionProxy:
 
                 try:
                     await up_writer.drain()
-                except ConnectionResetError, BrokenPipeError, OSError:
+                except (ConnectionResetError, BrokenPipeError, OSError):
                     break
 
                 # Read upstream response
@@ -2836,6 +2875,25 @@ class FleasionProxy:
                             resp_body_plain,
                         )
 
+                elif is_batch_v3:
+                    # v3 batch response: {"assets":[{assetId, assetTypeId, location},...]}
+                    # assetId is included directly in each response item, so we can
+                    # process the response body alone without the request body.
+                    _v3_resp_plain = _decompress_body(resp_body_raw, resp_headers)
+                    if _v3_resp_plain:
+                        if self.cache_scraper.enabled:
+                            self.cache_scraper.process_v3_batch_response(_v3_resp_plain)
+                        self.texture_stripper.process_v3_batch_response(_v3_resp_plain)
+                        # Strip removal-rule assets from the response so Roblox never
+                        # receives CDN URLs for them (mirrors v1's request-side removal).
+                        _v3_filtered = self.texture_stripper.filter_v3_batch_removals(
+                            _v3_resp_plain
+                        )
+                        if _v3_filtered is not None:
+                            resp_body_raw = _v3_filtered
+                            response_modified = True
+                            modified_content_encoding = None
+
                 elif host == ASSET_DELIVERY_HOST and not is_batch:
                     # Non-batch assetdelivery response (confirmed rare/non-existent
                     # in practice for TexturePack sub-assets after dedup fix).
@@ -2857,7 +2915,7 @@ class FleasionProxy:
                                 ),
                             )
 
-                elif host in CDN_HOSTS:
+                elif _is_cdn_host(host):
                     full_url = f'https://{host}{path}'
 
                     if short_circuit is not None and short_circuit[0] in (
@@ -3152,7 +3210,7 @@ class FleasionProxy:
 
                 try:
                     await writer.drain()
-                except ConnectionResetError, BrokenPipeError, OSError:
+                except (ConnectionResetError, BrokenPipeError, OSError):
                     break
 
                 if (

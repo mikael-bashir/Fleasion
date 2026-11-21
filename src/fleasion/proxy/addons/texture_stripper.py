@@ -894,7 +894,7 @@ class TextureStripper:
         # Numeric asset ID — look up via economy API
         try:
             aid = int(key)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return False
         return self._is_anim_asset_id(aid)
 
@@ -936,7 +936,7 @@ class TextureStripper:
                 if self._is_anim_asset_id(int(repl_id)):
                     paths_to_process.append(local_path)
                     continue
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 pass
             # Last resort: peek at magic bytes for .dat / extensionless files
             try:
@@ -1210,9 +1210,9 @@ class TextureStripper:
         try:
             data = _loads(body)
         except Exception:
-            return body
+            return body, body
         if not isinstance(data, list):
-            return body
+            return body, body
         self._register_batch(batch_id)
         # The server's tuple may have been read just before a UI config toggle.
         # Resolve it again after synchronizing the generation so this batch is
@@ -1869,6 +1869,115 @@ class TextureStripper:
                     self._solidmodel_injections[base_loc] = url_value
                     self._solidmodel_force_v3.add(base_loc)
                     log_buffer.log('SolidModel', f'Will inject OBJ for {base_loc[:60]}...')
+
+    # v3 batch response handler (called from server MITM thread)
+
+    def filter_v3_batch_removals(self, resp_body: bytes) -> bytes | None:
+        """Filter removal-rule assets out of a v3 batch response body.
+
+        v1 handles removals by dropping items from the request before sending to
+        Roblox. For v3 we can't modify the request, so we strip them from the
+        response instead — Roblox never receives a CDN URL for those assets and
+        the asset simply doesn't load (door becomes invisible, etc.).
+
+        Returns modified JSON bytes if anything was removed, or None if no changes.
+        """
+        if not resp_body:
+            return None
+        try:
+            res_json = _loads(resp_body)
+        except Exception:
+            return None
+        assets = res_json.get('assets') if isinstance(res_json, dict) else None
+        if not isinstance(assets, list):
+            return None
+
+        self._sync_replacements_generation()
+        _, removals, _, _ = self.config_manager.get_all_replacements()
+        if not removals:
+            return None
+
+        filtered = [
+            item
+            for item in assets
+            if not (
+                isinstance(item, dict)
+                and self._normalize_asset_id(item.get('assetId')) in removals
+            )
+        ]
+        if len(filtered) == len(assets):
+            return None
+
+        res_json['assets'] = filtered
+        result = _dumps(res_json)
+        log_buffer.log(
+            'Local',
+            f'[v3] Stripped {len(assets) - len(filtered)} removed asset(s) from batch response',
+        )
+        return result if isinstance(result, bytes) else result.encode()
+
+    def process_v3_batch_response(self, resp_body: bytes) -> None:
+        """Register CDN URL → replacement mappings from a /v3/assets/batch response.
+
+        v3 format includes assetId directly in each response item, so no request body
+        is needed. Handles local and CDN replacements; ID→ID replacements are only
+        honoured when the target has already been predownloaded to a local file.
+        """
+        if not resp_body:
+            return
+        try:
+            res_json = _loads(resp_body)
+        except Exception:
+            return
+        assets = res_json.get('assets') if isinstance(res_json, dict) else None
+        if not isinstance(assets, list):
+            return
+
+        self._sync_replacements_generation()
+        replacements, _, cdn_replacements, local_replacements = (
+            self.config_manager.get_all_replacements()
+        )
+        replacements = {
+            key: value
+            for key, value in replacements.items()
+            if self._normalize_asset_id(value) not in (0, 1)
+        }
+        if self._predownloaded:
+            replacements = dict(replacements)
+            local_replacements = dict(local_replacements)
+            for orig_id, repl_id in list(replacements.items()):
+                predownloaded = self._predownloaded.get(int(repl_id))
+                if predownloaded is not None:
+                    try:
+                        head = Path(predownloaded).read_bytes()[:2048].lower()
+                    except OSError:
+                        head = b''
+                    if b'<texturepack_version>' in head:
+                        continue
+                    del replacements[orig_id]
+                    local_replacements[orig_id] = predownloaded
+
+        with self._lock:
+            for item in assets:
+                if not isinstance(item, dict):
+                    continue
+                asset_id = self._normalize_asset_id(item.get('assetId'))
+                location = item.get('location')
+                if not location or asset_id is None:
+                    continue
+                base_loc = location.split('?')[0]
+                replacement_keys = [asset_id] + self._get_type_keys(item)
+
+                local_key = next((k for k in replacement_keys if k in local_replacements), None)
+                if local_key is not None:
+                    self._local_redirects[base_loc] = local_replacements[local_key]
+                    log_buffer.log('Local', f'[v3] Will serve local for {base_loc[:60]}...')
+                    continue
+
+                cdn_key = next((k for k in replacement_keys if k in cdn_replacements), None)
+                if cdn_key is not None:
+                    self._cdn_redirects[base_loc] = cdn_replacements[cdn_key]
+                    log_buffer.log('CDN', f'[v3] Will redirect {base_loc[:60]}...')
 
     # CDN request check (called from server MITM thread for Roblox CDN hosts)
 

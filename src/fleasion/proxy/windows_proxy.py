@@ -91,7 +91,7 @@ def _proxy_target(host: Optional[str], port: object) -> Optional[str]:
         return None
     try:
         port_int = int(str(port).strip())
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
     if port_int <= 0 or port_int > 65535:
         return None
